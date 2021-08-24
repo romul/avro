@@ -19,8 +19,13 @@ module Avro
   module IO
     # Raised when datum is not an example of schema
     class AvroTypeError < AvroError
-      def initialize(expected_schema, datum)
-        super("The datum #{datum.inspect} is not an example of schema #{expected_schema}")
+      def initialize(expected_schema, datum, field_name = nil)
+        message = if field_name
+          "The datum #{datum.inspect} is not a valid value of type #{expected_schema} for the `#{field_name}` field"
+        else
+          "The datum #{datum.inspect} is not an example of schema #{expected_schema}"
+        end
+        super(message)
       end
     end
 
@@ -520,11 +525,11 @@ module Avro
         write_data(writers_schema, datum, encoder)
       end
 
-      def write_data(writers_schema, logical_datum, encoder)
+      def write_data(writers_schema, logical_datum, encoder, field_name = nil)
         datum = writers_schema.type_adapter.encode(logical_datum)
 
         unless Schema.validate(writers_schema, datum, VALIDATION_OPTIONS)
-          raise AvroTypeError.new(writers_schema, datum)
+          raise AvroTypeError.new(writers_schema, datum, field_name)
         end
 
         # function dispatch to write datum
@@ -597,7 +602,7 @@ module Avro
       def write_record(writers_schema, datum, encoder)
         raise AvroTypeError.new(writers_schema, datum) unless datum.is_a?(Hash)
         writers_schema.fields.each do |field|
-          write_data(field.type, datum.key?(field.name) ? datum[field.name] : datum[field.name.to_sym], encoder)
+          write_data(field.type, datum.key?(field.name) ? datum[field.name] : datum[field.name.to_sym], encoder, field.name)
         end
       end
     end # DatumWriter
